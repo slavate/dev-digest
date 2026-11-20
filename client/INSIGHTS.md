@@ -12,6 +12,8 @@ Entry: `- YYYY-MM-DD — <what, concrete> — <path + symbol> — <what to do>`
 
 ## Codebase Patterns
 
+- 2026-11-20 — The "current repo" (URL > last used in `localStorage["dd-repo"]` > first) is resolved only in `RepoProvider` — `src/lib/repo-context.tsx` `useActiveRepo()` — pages needing a default repo must read `activeRepo` from it, never `useRepos().data[0]` (that was the "always opens the first repo" bug in `app/page.tsx`).
+
 - 2026-11-20 — `vendor/shared` differs from the server copy in 5 files (adapters, eval-ci, knowledge, productionize, trace) — check with `diff -r server/src/vendor/shared client/src/vendor/shared`.
 
 ## Tool & Library Notes

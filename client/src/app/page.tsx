@@ -1,9 +1,10 @@
-/* Root — sends the user to the first repo's PR list, or onboarding if no repos. */
+/* Root — sends the user to the last-used repo's PR list (else the first), or onboarding if no repos. */
 "use client";
 
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useRepos } from "../lib/hooks";
+import { useActiveRepo } from "../lib/repo-context";
 import { AppShell } from "../components/app-shell";
 import { PageContainer } from "../components/page-shell";
 import { EmptyState, Button, Skeleton } from "@devdigest/ui";
@@ -11,12 +12,11 @@ import { EmptyState, Button, Skeleton } from "@devdigest/ui";
 export default function HomePage() {
   const router = useRouter();
   const { data: repos, isLoading, isError } = useRepos();
+  const { activeRepo } = useActiveRepo();
 
   React.useEffect(() => {
-    if (repos && repos.length > 0) {
-      router.replace(`/repos/${repos[0]!.id}/pulls`);
-    }
-  }, [repos, router]);
+    if (activeRepo) router.replace(`/repos/${activeRepo.id}/pulls`);
+  }, [activeRepo, router]);
 
   return (
     <AppShell crumb={[{ label: "DevDigest" }]}>
@@ -27,7 +27,7 @@ export default function HomePage() {
             <Skeleton height={48} />
             <Skeleton height={48} />
           </div>
-        ) : isError || !repos || repos.length === 0 ? (
+        ) : isError || !repos || repos.length === 0 || !activeRepo ? (
           <EmptyState
             icon="GitBranch"
             title="No repositories yet"
@@ -38,8 +38,8 @@ export default function HomePage() {
         ) : (
           <div>
             <p style={{ color: "var(--text-secondary)", marginBottom: 14 }}>Taking you to your repository…</p>
-            <Button kind="primary" onClick={() => router.push(`/repos/${repos[0]!.id}/pulls`)}>
-              Open {repos[0]!.full_name}
+            <Button kind="primary" onClick={() => router.push(`/repos/${activeRepo.id}/pulls`)}>
+              Open {activeRepo.full_name}
             </Button>
           </div>
         )}
