@@ -18,6 +18,8 @@ Entry: `- YYYY-MM-DD — <what, concrete> — <path + symbol> — <what to do>`
 
 ## Recurring Errors & Fixes
 
+- 2026-11-20 — Adding a required field to a `vendor/shared` contract makes typed test fixtures fail with a misleading TS2719 "Two different types with this name exist, but they are unrelated" — e.g. `RunHistory.test.tsx` `run()` fixture (`RunSummary`) — the real cause is the missing field: add it to the fixture defaults.
+
 ## Session Notes
 
 ## Open Questions
