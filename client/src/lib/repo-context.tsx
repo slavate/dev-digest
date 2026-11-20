@@ -1,5 +1,5 @@
 /* repo-context.tsx — tracks the active repo for the shell + :repoId routing.
-   Priority: repoId in the URL path > localStorage > first repo from the API. */
+   Priority: repoId in the URL path > localStorage (last repo used) > first repo from the API. */
 "use client";
 
 import React from "react";
@@ -45,7 +45,16 @@ export function RepoProvider({ children }: { children: React.ReactNode }) {
 
   const list = repos ?? [];
   const fromPath = repoIdFromPath(pathname);
-  const repoId = fromPath ?? stored ?? list[0]?.id ?? null;
+  const pathIsKnown = fromPath != null && list.some((r) => r.id === fromPath);
+
+  // Remember repos opened by URL too (deep links, onboarding, post-delete redirect).
+  React.useEffect(() => {
+    if (pathIsKnown && fromPath !== stored) setRepoId(fromPath!);
+  }, [pathIsKnown, fromPath, stored, setRepoId]);
+
+  // A stored id of a deleted repo falls back to the first repo.
+  const validStored = list.some((r) => r.id === stored) ? stored : null;
+  const repoId = fromPath ?? validStored ?? list[0]?.id ?? null;
   const activeRepo = list.find((r) => r.id === repoId) ?? null;
 
   return (
