@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Provider } from './knowledge.js';
+import { Finding } from './findings.js';
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -156,6 +157,29 @@ export type Repo = z.infer<typeof Repo>;
 export const PrStatus = z.enum(['needs_review', 'reviewed', 'stale', 'open', 'closed', 'merged']);
 export type PrStatus = z.infer<typeof PrStatus>;
 
+/** A finding trimmed for the PR-list hover popover (rationale ≤ 240 chars). */
+export const FindingPreview = Finding.pick({
+  severity: true,
+  category: true,
+  title: true,
+  file: true,
+  start_line: true,
+  end_line: true,
+  confidence: true,
+  rationale: true,
+});
+export type FindingPreview = z.infer<typeof FindingPreview>;
+
+export const PrFindingsSummary = z.object({
+  CRITICAL: z.number().int(),
+  WARNING: z.number().int(),
+  SUGGESTION: z.number().int(),
+  total: z.number().int(),
+  /** Every counted finding, severity first, then confidence desc (the popover scrolls). */
+  findings: z.array(FindingPreview),
+});
+export type PrFindingsSummary = z.infer<typeof PrFindingsSummary>;
+
 export const PrMeta = z.object({
   id: z.string().nullish(),
   number: z.number().int(),
@@ -174,6 +198,9 @@ export const PrMeta = z.object({
   score: z.number().int().nullish(),
   // Sum of the PR's known run costs, USD (list endpoint only; null when no run has a cost).
   cost_usd: z.number().nullish(),
+  // Per-severity findings of each agent's latest review, dismissed excluded
+  // (list endpoint only; null until the PR has been reviewed).
+  findings_summary: PrFindingsSummary.nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

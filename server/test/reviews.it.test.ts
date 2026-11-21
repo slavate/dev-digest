@@ -261,6 +261,65 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('PR list findings_summary: latest review per agent, dismissed excluded', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agentA = crypto.randomUUID();
+    const agentB = crypto.randomUUID();
+    const review = async (agentId: string, createdAt: string, score: number) =>
+      (
+        await pg.handle.db
+          .insert(t.reviews)
+          .values({ workspaceId, prId: pr.id, agentId, kind: 'review', score, createdAt: new Date(createdAt) })
+          .returning()
+      )[0]!;
+    const finding = (reviewId: string, severity: string, title: string, dismissed = false) => ({
+      reviewId,
+      severity,
+      title,
+      category: 'bug',
+      file: 'src/a.ts',
+      startLine: 1,
+      endLine: 2,
+      rationale: 'why',
+      confidence: 0.9,
+      dismissedAt: dismissed ? new Date() : null,
+    });
+    const oldA = await review(agentA, '2026-01-01T00:00:00Z', 10);
+    const newA = await review(agentA, '2026-01-02T00:00:00Z', 50);
+    const b = await review(agentB, '2026-01-01T12:00:00Z', 70);
+    await pg.handle.db.insert(t.findings).values([
+      finding(oldA.id, 'CRITICAL', 'superseded by the re-run'),
+      finding(newA.id, 'WARNING', 'open warning'),
+      finding(newA.id, 'CRITICAL', 'dismissed critical', true),
+      finding(b.id, 'SUGGESTION', 'agent B suggestion'),
+    ]);
+    // A reviewed PR with no findings, and a PR never reviewed.
+    const extraPr = async (number: number) =>
+      (
+        await pg.handle.db
+          .insert(t.pullRequests)
+          .values({
+            workspaceId, repoId: repo.id, number, title: `PR ${number}`, author: 'a', branch: 'b',
+            base: 'main', headSha: 'ffff', additions: 1, deletions: 0, filesCount: 1, status: 'needs_review',
+          })
+          .returning()
+      )[0]!;
+    const clean = await extraPr(490);
+    await pg.handle.db.insert(t.reviews).values({ workspaceId, prId: clean.id, agentId: agentA, kind: 'review', score: 95 });
+    await extraPr(491);
+
+    const list = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    const byNumber = (n: number) => list.find((p: { number: number }) => p.number === n);
+    const s482 = byNumber(482).findings_summary;
+    expect(s482).toMatchObject({ CRITICAL: 0, WARNING: 1, SUGGESTION: 1, total: 2 });
+    expect(s482.findings.map((f: { title: string }) => f.title)).toEqual(['open warning', 'agent B suggestion']);
+    expect(byNumber(482).score).toBe(50); // score ring still uses the PR's latest review
+    expect(byNumber(490).findings_summary).toEqual({ CRITICAL: 0, WARNING: 0, SUGGESTION: 0, total: 0, findings: [] });
+    expect(byNumber(491).findings_summary).toBeNull();
+    await app.close();
+  });
+
   it('dual-provider structured output: anthropic provider returns the same Review shape', async () => {
     const app = await appWith(REVIEW_FIXTURE, 'anthropic');
     const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
