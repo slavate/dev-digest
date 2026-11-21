@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray, sum } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
+import { and, desc, eq, inArray, isNull, sum } from 'drizzle-orm';
+import type { PrMeta, PrDetail, GitHubClient, PrReviewComment, PrFindingsSummary } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus } from './status.js';
+import { latestReviewPerAgent, summarizeFindings, type FindingRow } from './findings-summary.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -111,22 +112,46 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE per PR for the list's score ring. Computed on read
-    // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // Latest-review SCORE per PR for the list's score ring, plus the FINDINGS
+    // summary (each agent's latest review, dismissed excluded). Computed on read
+    // from reviews (no FK denorm); the list is small, so IN-queries + JS
+    // grouping are cheap and the query count doesn't grow with the PR count.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null }>();
     const costByPr = new Map<string, number>();
+    const findingsByPr = new Map<string, FindingRow[]>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score })
+        .select({ id: t.reviews.id, prId: t.reviews.prId, agentId: t.reviews.agentId, score: t.reviews.score })
         .from(t.reviews)
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
       // Rows are newest-first → first seen per PR is the latest review.
       for (const rv of reviewRows) {
         if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score });
+      }
+      const countedReviews = latestReviewPerAgent(reviewRows);
+      if (countedReviews.size > 0) {
+        const findingRows = await container.db
+          .select({
+            reviewId: t.findings.reviewId,
+            severity: t.findings.severity,
+            category: t.findings.category,
+            title: t.findings.title,
+            file: t.findings.file,
+            startLine: t.findings.startLine,
+            endLine: t.findings.endLine,
+            confidence: t.findings.confidence,
+            rationale: t.findings.rationale,
+          })
+          .from(t.findings)
+          .where(and(inArray(t.findings.reviewId, [...countedReviews.keys()]), isNull(t.findings.dismissedAt)));
+        for (const f of findingRows) {
+          const prId = countedReviews.get(f.reviewId)!;
+          const list = findingsByPr.get(prId) ?? [];
+          list.push(f);
+          findingsByPr.set(prId, list);
+        }
       }
       // Total spend per PR across every run. SUM skips NULL (unknown) costs and
       // is NULL when no run has a cost → the list shows "—", never a fake $0.
@@ -143,6 +168,10 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
+      // Reviewed PR with no open findings → zeros; never reviewed → null.
+      const findingsSummary: PrFindingsSummary | null = review
+        ? summarizeFindings(findingsByPr.get(r.id) ?? [])
+        : null;
       return {
         id: r.id,
         number: r.number,
@@ -165,6 +194,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: costByPr.get(r.id) ?? null,
+        findings_summary: findingsSummary,
       };
     });
   });

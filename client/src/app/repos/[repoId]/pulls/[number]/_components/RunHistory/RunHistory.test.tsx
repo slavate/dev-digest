@@ -5,9 +5,9 @@
  * and shows the review score ring.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { RunSummary, FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
 
@@ -35,10 +35,10 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function renderRuns(runs: RunSummary[], findingsByRun?: Map<string, FindingRecord[]>) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} onOpenTrace={() => {}} findingsByRun={findingsByRun} />
     </NextIntlClientProvider>,
   );
 }
@@ -92,5 +92,65 @@ describe("RunHistory — cost", () => {
       run({ run_id: "r", status: "running", cost_usd: 0.5 }),
     ]);
     expect(screen.queryByText(/tok ·/)).not.toBeInTheDocument();
+  });
+});
+
+function finding(id: string, severity: FindingRecord["severity"]): FindingRecord {
+  return {
+    id,
+    severity,
+    category: "bug",
+    title: `${severity} finding ${id}`,
+    file: "src/a.ts",
+    start_line: 1,
+    end_line: 1,
+    rationale: "why",
+    suggestion: null,
+    confidence: 0.9,
+    kind: "finding",
+    trifecta_components: null,
+    evidence: null,
+    review_id: "rev-1",
+    accepted_at: null,
+    dismissed_at: null,
+  };
+}
+
+const RUN_FINDINGS = [
+  finding("1", "CRITICAL"),
+  finding("2", "WARNING"),
+  finding("3", "WARNING"),
+  finding("4", "WARNING"),
+  finding("5", "WARNING"),
+];
+
+describe("RunHistory — severity counts", () => {
+  it("a done run with linked findings shows severity counts instead of the text, keeps blockers", () => {
+    renderRuns(
+      [run({ status: "done", findings_count: 5, blockers: 1, score: 17 })],
+      new Map([["run-1", RUN_FINDINGS]]),
+    );
+    expect(screen.getByLabelText("Findings: 1 critical, 4 warning, 0 suggestion")).toBeInTheDocument();
+    expect(screen.queryByText(/5 finding/)).not.toBeInTheDocument();
+    expect(screen.getByText(/1 blockers/)).toBeInTheDocument();
+  });
+
+  it("hover lists every finding of the run (not capped at 3)", () => {
+    renderRuns([run({ status: "done", findings_count: 5 })], new Map([["run-1", RUN_FINDINGS]]));
+    fireEvent.mouseEnter(screen.getByLabelText("Findings: 1 critical, 4 warning, 0 suggestion"));
+    const tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent("5 findings in this run");
+    for (const f of RUN_FINDINGS) expect(tip).toHaveTextContent(f.title);
+  });
+
+  it("a done run without a linked review keeps the plain count text", () => {
+    renderRuns([run({ status: "done", findings_count: 3 })], new Map());
+    expect(screen.getByText("3 finding(s)")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Findings:/)).not.toBeInTheDocument();
+  });
+
+  it("a failed run shows no counts", () => {
+    renderRuns([run({ status: "failed", error: "boom" })], new Map([["run-1", RUN_FINDINGS]]));
+    expect(screen.queryByLabelText(/^Findings:/)).not.toBeInTheDocument();
   });
 });

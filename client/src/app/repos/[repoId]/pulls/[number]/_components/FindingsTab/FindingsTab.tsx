@@ -45,6 +45,12 @@ export function FindingsTab({
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
   }, [liveRunIds, cancelMutation]);
 
+  // Timeline rows show their run's findings; reviews link to runs via run_id.
+  const findingsByRun = React.useMemo(
+    () => new Map(runs.flatMap((r) => (r.run_id ? [[r.run_id, r.findings] as const] : []))),
+    [runs],
+  );
+
   const handleOpenFirstTrace = useCallback(() => {
     if (liveRunIds[0]) onOpenTrace(liveRunIds[0]);
   }, [liveRunIds, onOpenTrace]);
@@ -130,6 +136,7 @@ export function FindingsTab({
           </SectionLabel>
           <RunHistory
             runs={prRuns ?? []}
+            findingsByRun={findingsByRun}
             commits={prCommits}
             onOpenTrace={handleOpenTrace}
             onGoToReview={handleGoToReview}
