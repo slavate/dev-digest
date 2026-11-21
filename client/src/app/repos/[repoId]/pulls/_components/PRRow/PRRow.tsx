@@ -10,6 +10,7 @@ import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
 import { s } from "../../styles";
 import { RunCostBadge } from "../RunCostBadge";
+import { FindingsSummary } from "../FindingsSummary";
 
 export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const t = useTranslations("prReview");
@@ -18,6 +19,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
+  const findings = pr.findings_summary;
   return (
     <div
       onMouseEnter={() => setH(true)}
@@ -50,6 +52,17 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
       <div style={s.scoreCell}>
         {reviewed ? (
           <CircularScore score={pr.score!} size={34} stroke={3} />
+        ) : (
+          <span style={s.muted}>—</span>
+        )}
+      </div>
+      <div>
+        {findings && findings.total > 0 ? (
+          <FindingsSummary
+            counts={findings}
+            findings={findings.findings}
+            title={t("list.findingsTitle", { count: findings.total })}
+          />
         ) : (
           <span style={s.muted}>—</span>
         )}

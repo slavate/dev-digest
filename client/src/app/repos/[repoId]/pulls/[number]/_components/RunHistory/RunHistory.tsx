@@ -3,8 +3,9 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import type { RunSummary, PrCommit, FindingRecord } from "@devdigest/shared";
 import { RunCostBadge } from "../../../_components/RunCostBadge";
+import { FindingsSummary, countBySeverity } from "../../../_components/FindingsSummary";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -91,8 +92,11 @@ export function RunHistory({
   onOpenTrace,
   onGoToReview,
   onDelete,
+  findingsByRun,
 }: {
   runs: RunSummary[];
+  /** run_id → that run's review findings; a run with none here keeps the plain "N finding(s)" text. */
+  findingsByRun?: Map<string, FindingRecord[]>;
   commits?: PrCommit[];
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
@@ -150,6 +154,7 @@ export function RunHistory({
         const r = item.run;
         const o = outcomeOf(r);
         const settled = r.status === "done";
+        const runFindings = findingsByRun?.get(r.run_id);
         return (
           <div key={`run:${r.run_id}`} style={rowStyle}>
             <Badge color={o.color} bg={o.bg} icon={o.icon}>
@@ -191,7 +196,15 @@ export function RunHistory({
               )}
               {settled && (
                 <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
+                  {runFindings?.length ? (
+                    <FindingsSummary
+                      counts={countBySeverity(runFindings)}
+                      findings={runFindings}
+                      title={t("timeline.findingsInRun", { count: runFindings.length })}
+                    />
+                  ) : (
+                    t("runStatus.findings", { count: r.findings_count ?? 0 })
+                  )}
                   {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
                 </div>
               )}
