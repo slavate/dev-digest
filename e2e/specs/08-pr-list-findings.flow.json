@@ -1,0 +1,12 @@
+{
+  "name": "PR list Findings column shows severity counts and a findings popover",
+  "description": "On the seeded PR list, PR #482's Findings cell summarises its one seeded review (1 CRITICAL, 1 WARNING). Hovering the cell opens the findings popover, which lists the seeded finding titles — text that appears nowhere else on the list page. Read-only seeded data (no model call). Run via the hermetic stack (see e2e/README.md).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["wait", "--text", "Add rate limiting to public API endpoints"], "label": "seeded PR title row is visible" },
+    { "cmd": ["find", "label", "Findings: 1 critical, 1 warning, 0 suggestion", "hover"], "label": "hover #482's Findings cell" },
+    { "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"], "label": "popover lists the seeded CRITICAL finding" },
+    { "cmd": ["wait", "--text", "N+1 query in user list endpoint"], "label": "popover lists the seeded WARNING finding" }
+  ]
+}
