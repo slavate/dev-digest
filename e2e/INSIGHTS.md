@@ -8,6 +8,8 @@ Entry: `- YYYY-MM-DD — <what, concrete> — <path + symbol> — <what to do>`
 
 ## What Works
 
+- 2026-11-21 — Demo videos: `agent-browser --session demo record start <file>.mp4 --cursor` … `record stop` records client-side navigation in one take, but needs `ffmpeg` on PATH (`brew install ffmpeg`); against the dev stack the PR list opens on the "Needs review" filter and a real PR's detail loads slowly (GitHub sync) — click "All" first and `wait --text "Agent runs"` instead of fixed pauses; script kept outside the repo.
+
 ## What Doesn't Work
 
 ## Codebase Patterns
@@ -16,7 +18,13 @@ Entry: `- YYYY-MM-DD — <what, concrete> — <path + symbol> — <what to do>`
 
 ## Tool & Library Notes
 
+- 2026-11-21 — `find label "<aria-label>" hover` matches a non-form element by its `aria-label` and works for hover-only UI — `specs/08-pr-list-findings.flow.json` — give hover triggers a descriptive `aria-label` and target them this way; the seed has no `agent_runs`, so Timeline run rows can't be e2e-tested without extending `server/src/db/seed.ts`.
+
+- 2026-11-21 — `find text "1 WARNING" click` failed with no reason printed when the text sat in a button inside a row whose combined text also contains it; `find role button click --name "1 WARNING"` worked — `specs/04-pr-findings.flow.json` (severity counter step) — to click a button, use a role locator, not `find text`.
+
 ## Recurring Errors & Fixes
+
+- 2026-11-21 — Supersedes 2026-11-20 open question: the `open the PR row` failure is the race — adding `wait --text "Add rate limiting to public API endpoints"` before the click made flow 04 pass — `specs/04-pr-findings.flow.json` — flow 05 (`specs/05-pr-diff.flow.json`) still lacks that step and still fails; add it there.
 
 - 2026-11-20 — `npm i -g agent-browser` fails with EACCES when the npm prefix is root-owned `/usr/local` — `run.ts` `BIN` — install with `npm i -g --prefix ~/.npm-global agent-browser` and run `AGENT_BROWSER_BIN=~/.npm-global/bin/agent-browser ../scripts/e2e.sh` (the env var passes through `e2e.sh`); no sudo needed.
 
