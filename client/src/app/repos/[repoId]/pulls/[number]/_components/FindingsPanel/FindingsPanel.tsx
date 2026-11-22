@@ -4,10 +4,11 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import { Toggle, EmptyState, Icon, SEV } from "@devdigest/ui";
+import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
+import { countBySeverity, SEVERITIES } from "../../../_components/FindingsSummary";
 import { KEY_TO_ACTION } from "./constants";
 import { visibleFindings } from "./helpers";
 import { s } from "./styles";
@@ -26,9 +27,23 @@ export function FindingsPanel({
   const t = useTranslations("prReview");
   const action = useFindingAction();
   const [hideLow, setHideLow] = React.useState(false);
+  const [severity, setSeverity] = React.useState<Severity | null>(null);
   const [focusIdx, setFocusIdx] = React.useState(0);
 
-  const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  // Counts follow the list as shown without the severity filter, so they always match the cards.
+  const counts = React.useMemo(
+    () => countBySeverity(visibleFindings(findings, hideLow)),
+    [findings, hideLow],
+  );
+  const shown = React.useMemo(
+    () => visibleFindings(findings, hideLow, severity),
+    [findings, hideLow, severity],
+  );
+
+  const toggleSeverity = (sev: Severity) => {
+    setSeverity((cur) => (cur === sev ? null : sev));
+    setFocusIdx(0);
+  };
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {
@@ -48,6 +63,33 @@ export function FindingsPanel({
   return (
     <div>
       <div style={s.toolbar}>
+        <div role="group" aria-label={t("panel.severityFilter")} style={s.sevGroup}>
+          {SEVERITIES.map((sev, i) => {
+            const active = severity === sev;
+            const SevIcon = Icon[SEV[sev].icon];
+            return (
+              <React.Fragment key={sev}>
+                {i > 0 && <span style={s.sevSep}>·</span>}
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  disabled={counts[sev] === 0 && !active}
+                  onClick={() => toggleSeverity(sev)}
+                  style={{
+                    ...s.sevBtn,
+                    color: SEV[sev].c,
+                    background: active ? SEV[sev].bg : "transparent",
+                    borderColor: active ? SEV[sev].c : "transparent",
+                    ...(counts[sev] === 0 && !active ? s.sevBtnDisabled : null),
+                  }}
+                >
+                  <SevIcon size={12.5} />
+                  {counts[sev]} {sev}
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
         <div style={s.toggleGroup}>
           {t("panel.hideLowConfidence")}
           <Toggle on={hideLow} onChange={setHideLow} size={16} />

@@ -4,6 +4,7 @@
   "steps": [
     { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
     { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["wait", "--text", "Add rate limiting to public API endpoints"], "label": "seeded PR title row is visible" },
     { "cmd": ["find", "text", "Add rate limiting to public API endpoints", "click"], "label": "open the PR row" },
     { "cmd": ["wait", "--url", "/pulls/482"], "label": "navigate to the PR detail route" },
     { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
@@ -11,6 +12,9 @@
     { "cmd": ["wait", "--url", "tab=findings"], "label": "findings tab is active in the URL" },
     { "cmd": ["wait", "--text", "request changes"], "label": "seeded run accordion shows its verdict" },
     { "cmd": ["wait", "--text", "2 findings"], "label": "accordion header shows the seeded finding count" },
-    { "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"], "label": "seeded FindingCard is visible (newest run is open by default)" }
+    { "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"], "label": "seeded FindingCard is visible (newest run is open by default)" },
+    { "cmd": ["wait", "--text", "1 CRITICAL"], "label": "severity counters render above the run's findings" },
+    { "cmd": ["find", "role", "button", "click", "--name", "1 WARNING"], "label": "filter the run to WARNING findings" },
+    { "cmd": ["wait", "--text", "N+1 query in user list endpoint"], "label": "the WARNING finding is listed" }
   ]
 }
